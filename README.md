@@ -1,28 +1,40 @@
+# LsMs ROS for SPARO Lab
+
 LaMa ROS - Alternative Localization and Mapping for ROS.
 ========================================================
 https://github.com/iris-ua/iris_lama_ros
 
-![Build Melodic](https://github.com/iris-ua/iris_lama_ros/workflows/Build%20Melodic/badge.svg)
 
-Developed and maintained by Eurico Pedrosa, University of Aveiro (C) 2019.
+The main code is developed and maintained by Eurico Pedrosa, University of Aveiro. 
+We modified the base code and launch files for 2d Navigation.
 
-Overview
---------
 
-ROS integration of [LaMa]( https://github.com/iris-ua/iris_lama), a Localization and Mapping package from the **Intelligent Robotics and Systems** (IRIS) Laboratory, University of Aveiro. It provides 2D Localization and SLAM. It works great on a [TurtleBot2](https://www.turtlebot.com/turtlebot2/) with a [Raspberry Pi 3 Model B+](https://www.raspberrypi.org/products/raspberry-pi-3-model-b-plus/) and an Hokuyo (Rapid URG).
+### Build
 
-#### Build
+To build LaMa ROS, clone it from GitHub and use `catkin tools` to build.
 
-To build LaMa ROS, clone it from GitHub and use `catkin` to build.
+```
+sudo apt install python-catkin-tools
+```
+
+After instruction catkin tools, you can clone githubs and build with catkin tools. 
+
 ```
 mkdir src
 cd src
-git clone https://github.com/iris-ua/iris_lama
-git clone https://github.com/iris-ua/iris_lama_ros
+git clone https://github.com/sparolab/iris_lama
+git clone https://github.com/sparolab/iris_lama_ros
 cd ..
 catkin config --extend /opt/ros/melodic
 catkin build
 ```
+
+### Overview
+
+--------
+
+ROS integration of [LaMa]( https://github.com/iris-ua/iris_lama), a Localization and Mapping package from the **Intelligent Robotics and Systems** (IRIS) Laboratory, University of Aveiro. It provides 2D Localization and SLAM. It works great on a [TurtleBot2](https://www.turtlebot.com/turtlebot2/) with a [Raspberry Pi 3 Model B+](https://www.raspberrypi.org/products/raspberry-pi-3-model-b-plus/) and an Hokuyo (Rapid URG).
+
 The build was tested in **Ubuntu 18.04** with ROS **melodic**. It will not build with `catkin_make` or `catkin_make_isolated`.
 
 ## SLAM nodes
