@@ -18,5 +18,5 @@
     <arg name="move_forward_only" value="$(arg move_forward_only)"/>
   </include>
   
-  <node pkg="rviz" type="rviz" name="rviz" required="true" args="-d $(find sparo_2d_navigation)/rviz/sparo_2d_navigation.rviz"/>
+  <node pkg="rviz" type="rviz" name="rviz" required="true" args="-d $(find iris_lama_ros)/rviz/sparo_2d_navigation.rviz"/>
 </launch>
