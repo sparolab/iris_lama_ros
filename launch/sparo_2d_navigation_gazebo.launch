@@ -11,7 +11,7 @@
   <node pkg="map_server" name="map_server" type="map_server" args="$(arg map_file)"/>
 
   <!-- AMCL -->
-  <include file="$(find iris_lama_ros)/launch/loc2d.launch"/>
+  <include file="$(find iris_lama_ros)/launch/sparo_2d_localization_omor1.launch"/>
 
   <!-- move_base -->
   <include file="$(find sparo_2d_navigation)/launch/move_base_gazebo.launch">

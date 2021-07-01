@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="scan_topic" default="/scan"/>
+
+    <node pkg="iris_lama_ros" name="slam2d_ros" type="slam2d_ros" output="screen" required="true">
+        <param name="scan_topic" value="$(arg scan_topic)"/>
+    </node>
+</launch>

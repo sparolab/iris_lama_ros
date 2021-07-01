@@ -1,13 +1,6 @@
-# LsMs ROS for SPARO Lab
+# LaMa ROS for SPARO Lab
 
 LaMa ROS - Alternative Localization and Mapping for ROS.
-========================================================
-https://github.com/iris-ua/iris_lama_ros
-
-
-The main code is developed and maintained by Eurico Pedrosa, University of Aveiro. 
-We modified the base code and launch files for 2d Navigation.
-
 
 ### Build
 
@@ -29,6 +22,44 @@ catkin config --extend /opt/ros/melodic
 catkin build
 ```
 
+---
+https://github.com/iris-ua/iris_lama_ros
+
+
+The main code is developed and maintained by Eurico Pedrosa, University of Aveiro. 
+We modified the base code and launch files for 2d Navigation.
+
+## SLAM nodes (Online Mapping)
+
+To create a map using *Online SLAM* execute
+```
+roslaunch iris_lama_ros sparo_2d_mapping_omor1.launch
+```
+The nodes will publish to expected topics such as `/map` and `/tf`.
+
+## Offline Mapping (From rosbag)
+If you want to obtain a map from a rosbag and you want to save time (a lot),
+you can let iris_lama_ros "play" the rosbag for you.
+
+```
+roslaunch iris_lama_ros slam2d_offine.launch scan_topic:=scan rosbag:=/path/your/rosbag.bag
+```
+or
+```
+roslaunch iris_lama_ros pf_slam2d_offine.launch scan_topic:=scan rosbag:=/path/your/rosbag.bag
+```
+
+## Localization nodes (Localization only)
+
+This node requires the existence of the `/static_map` service to load the map.
+To run the localization just execute
+
+```
+roslaunch iris_lama_ros sparo_2d_localization_omor1.launch
+```
+
+
+
 ### Overview
 
 --------
@@ -37,31 +68,15 @@ ROS integration of [LaMa]( https://github.com/iris-ua/iris_lama), a Localization
 
 The build was tested in **Ubuntu 18.04** with ROS **melodic**. It will not build with `catkin_make` or `catkin_make_isolated`.
 
-## SLAM nodes
 
-To create a map using *Online SLAM* execute
-```
-rosrun iris_lama_ros slam2d_ros scan_topic:=base_scan
-```
-and to create a map using *Particle Filter SLAM* execute
+and to create a map using *Particle Filter SLAM* execute (Not recommended)
 ```
 rosrun iris_lama_ros pf_slam2d_ros scan_topic:=base_scan
 ```
 
-Both nodes will publish to expected topics such as `/map` and `/tf`.
 
-### Offline Mapping (rosbag)
 
-If you want to obtain a map from a rosbag and you want to save time (a lot),
-you can let iris_lama_ros "play" the rosbag for you.
 
-```
-roslaunch iris_lama_ros slam2d_offine.launch scan_topic:=base_scan rosbag:=/path/your/rosbag.bag
-```
-or
-```
-roslaunch iris_lama_ros pf_slam2d_offine.launch scan_topic:=base_scan rosbag:=/path/your/rosbag.bag
-```
 
 ### Parameters
 
