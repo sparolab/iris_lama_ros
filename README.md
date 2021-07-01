@@ -35,6 +35,8 @@ To create a map using *Online SLAM* execute
 ```
 roslaunch iris_lama_ros sparo_2d_mapping_omor1.launch
 ```
+
+
 The nodes will publish to expected topics such as `/map` and `/tf`.
 
 ## Offline Mapping (From rosbag)
@@ -42,11 +44,7 @@ If you want to obtain a map from a rosbag and you want to save time (a lot),
 you can let iris_lama_ros "play" the rosbag for you.
 
 ```
-roslaunch iris_lama_ros slam2d_offine.launch scan_topic:=scan rosbag:=/path/your/rosbag.bag
-```
-or
-```
-roslaunch iris_lama_ros pf_slam2d_offine.launch scan_topic:=scan rosbag:=/path/your/rosbag.bag
+roslaunch iris_lama_ros sparo_2d_offline_mapping.launch rosbag:=/path/your/rosbag.bag
 ```
 
 ## Localization nodes (Localization only)
@@ -57,26 +55,6 @@ To run the localization just execute
 ```
 roslaunch iris_lama_ros sparo_2d_localization_omor1.launch
 ```
-
-
-
-### Overview
-
---------
-
-ROS integration of [LaMa]( https://github.com/iris-ua/iris_lama), a Localization and Mapping package from the **Intelligent Robotics and Systems** (IRIS) Laboratory, University of Aveiro. It provides 2D Localization and SLAM. It works great on a [TurtleBot2](https://www.turtlebot.com/turtlebot2/) with a [Raspberry Pi 3 Model B+](https://www.raspberrypi.org/products/raspberry-pi-3-model-b-plus/) and an Hokuyo (Rapid URG).
-
-The build was tested in **Ubuntu 18.04** with ROS **melodic**. It will not build with `catkin_make` or `catkin_make_isolated`.
-
-
-and to create a map using *Particle Filter SLAM* execute (Not recommended)
-```
-rosrun iris_lama_ros pf_slam2d_ros scan_topic:=base_scan
-```
-
-
-
-
 
 ### Parameters
 
@@ -152,3 +130,9 @@ Please use `rviz` to set the initial pose. Global localization is not yet implem
 * `~gloc_particles`: Number of particles used to find the best global localization (default: 3000)
 * `~gloc_thresh`: Value at which a global localization particle is considered viable. (default: 0.15 RMSE)
 * `~gloc_iters`: Maximum number of iterations executed by the global localization procedure (default: 20)
+
+
+### Original Code
+
+--------
+The base code is developed by IRIS Lab. ROS integration of [LaMa]( https://github.com/iris-ua/iris_lama), a Localization and Mapping package from the **Intelligent Robotics and Systems** (IRIS) Laboratory, University of Aveiro. It provides 2D Localization and SLAM. It works great on a [TurtleBot2](https://www.turtlebot.com/turtlebot2/) with a [Raspberry Pi 3 Model B+](https://www.raspberrypi.org/products/raspberry-pi-3-model-b-plus/) and an Hokuyo (Rapid URG).
