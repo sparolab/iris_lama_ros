@@ -1,6 +1,6 @@
 <launch>
   <!-- Arguments -->
-  <arg name="map_file" default="$(find sparo_2d_navigation)/maps/210621_3rd.yaml"/>
+  <arg name="map_file" default="$(find sparo_2d_navigation)/maps/rb_bldg_3rd_edited.yaml"/>
   <arg name="open_rviz" default="true"/>
   <arg name="move_forward_only" default="false"/>
 
