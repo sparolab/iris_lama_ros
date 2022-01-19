@@ -31,6 +31,8 @@
  *
  */
 
+#include <cstdlib>
+
 #include <nav_msgs/GetMap.h>
 
 #include "lama/ros/loc2d_ros.h"
@@ -49,10 +51,17 @@ lama::Loc2DROS::Loc2DROS()
     pnh_.param("scan_topic", scan_topic_, std::string("scan"));
 
     pnh_.param("transform_tolerance", tmp, 0.1); transform_tolerance_.fromSec(tmp);
+    pnh_.param("temporal_update", temporal_update_, 0.0);
 
+    pnh_.param("publish_tf", publish_tf_, true);
     pnh_.param("use_map_topic", use_map_topic_, false);
     pnh_.param("first_map_only", first_map_only_, false);
     pnh_.param("use_pose_on_new_map", use_pose_on_new_map_, false);
+
+    bool use_map_sideloading;
+    std::string map_sideloading_dir;
+    pnh_.param("use_map_sideloading", use_map_sideloading, false);
+    pnh_.param("map_sideloading_dir", map_sideloading_dir, std::string(""));
 
     pnh_.param("force_update_on_initial_pose", force_update_on_initial_pose_, false);
 
@@ -68,6 +77,7 @@ lama::Loc2DROS::Loc2DROS()
     laser_scan_filter_->registerCallback(boost::bind(&Loc2DROS::onLaserScan, this, _1));
 
     pose_sub_ = nh_.subscribe("initialpose", 1, &Loc2DROS::onInitialPose, this);
+    result_pose_sub_ = nh_.subscribe("result_pose", 1, &Loc2DROS::onPose, this);
 
     // Set publishers
     pose_pub_ = nh_.advertise<geometry_msgs::PoseWithCovarianceStamped>("pose", 2, true);
@@ -88,7 +98,12 @@ lama::Loc2DROS::Loc2DROS()
     pnh_.param("l2_max",   options_.l2_max, 0.5);
     pnh_.param("strategy", options_.strategy, std::string("gn"));
 
+    pnh_.param("covariance_blend", options_.cov_blend, 0.0);
+
     int dummy;
+    pnh_.param("patch_size", dummy, 32);
+    options_.patch_size = dummy;
+
     pnh_.param("gloc_particles", dummy, 3000);
     options_.gloc_particles = dummy;
 
@@ -102,28 +117,72 @@ lama::Loc2DROS::Loc2DROS()
     // make sure the beam step is positive
     beam_step_ = std::max(1, beam_step_);
 
-    // Request the map if not using the map topic
-    if (not use_map_topic_)
-    {
-        ROS_INFO("Requesting the map...");
-        nav_msgs::GetMap::Request  req;
-        nav_msgs::GetMap::Response resp;
-        while(ros::ok() and not ros::service::call("static_map", req, resp)){
-            ROS_WARN_THROTTLE(1, "Request for map failed; trying again ...");
-            ros::Duration d(0.5);
-            d.sleep();
-        }// end while
+    // The pose is published in the global frame.
+    cur_pose_msg_.header.frame_id = global_frame_id_;
+    // No map ultil now...
+    first_map_received_ = false;
 
-        int itmp;
-        pnh_.param("patch_size", itmp, 32);
-        options_.patch_size = itmp;
+    if (use_map_sideloading){
 
-        InitLoc2DFromOccupancyGridMsg(initial_prior_, resp.map);
-    }
-    else
-    {
-        map_sub_ = nh_.subscribe("map", 10, &Loc2DROS::onMapReceived, this, ros::TransportHints().tcpNoDelay());
-    }
+        ROS_INFO("Sideloading maps...");
+        ros::WallTime start = ros::WallTime::now();
+
+        char c_abs_path[PATH_MAX+1];
+        char* ptr = realpath(map_sideloading_dir.c_str(), c_abs_path);
+
+        if (ptr == nullptr){
+            if (map_sideloading_dir != "")
+                ROS_WARN("Failed to resolve sideloading directory. Reverting to current directory.");
+            ptr = getcwd(c_abs_path, sizeof(c_abs_path));
+        }
+
+        loc2d_.Init(options_);
+
+        std::string abs_path(c_abs_path);
+        // If the first map fails to load, the second one is skipped
+        bool ok = loc2d_.occupancy_map->read(abs_path + "/occ.sdm") &&
+                  loc2d_.distance_map->read(abs_path + "/dm.sdm");
+
+        if (ok){
+            auto loadtime = (ros::WallTime::now() - start).toSec();
+            ROS_INFO("Maps loaded in %f seconds", loadtime);
+
+            onInitialPose(initial_prior_);
+            first_map_received_ = true;
+        } else {
+            ROS_ERROR("Failed to sideloading the maps. Check your 'occ.sdm' and 'dm.sdm' files.");
+        }
+    }// end if (use_map_sideloading)
+
+    if (not first_map_received_){
+        // If sideloading is requested and it fails, it will still load a map...
+        if (use_map_sideloading)
+            ROS_WARN("Loading map from map_server.");
+
+        if (not use_map_topic_) {
+            // Request the map if not using the map topic
+            ROS_INFO("Requesting the map...");
+            nav_msgs::GetMap::Request  req;
+            nav_msgs::GetMap::Response resp;
+            while(ros::ok() and not ros::service::call("static_map", req, resp)){
+                ROS_WARN_THROTTLE(1, "Request for map failed; trying again ...");
+                ros::Duration d(0.5);
+                d.sleep();
+            }// end while
+
+            InitLoc2DFromOccupancyGridMsg(initial_prior_, resp.map);
+        } else {
+            ROS_INFO("Waiting for a map message...");
+            auto msg = ros::topic::waitForMessage<nav_msgs::OccupancyGrid>("map", nh_);
+            onMapReceived(msg);
+
+            if (not first_map_only_){
+                // setup the subscriber for future changes..
+                map_sub_ = nh_.subscribe("map", 10, &Loc2DROS::onMapReceived, this, ros::TransportHints().tcpNoDelay());
+            }
+        }
+
+    }// end if (not first_map_received_)
 
     // Should trigger an initial global localization?
     bool do_global_loc;
@@ -133,8 +192,6 @@ lama::Loc2DROS::Loc2DROS()
         loc2d_.triggerGlobalLocalization();
     }
 
-    // The pose is published in the global frame.
-    cur_pose_msg_.header.frame_id = global_frame_id_;
 
     ROS_INFO("2D Localization node up and running");
 }
@@ -176,11 +233,28 @@ void lama::Loc2DROS::onInitialPose(const geometry_msgs::PoseWithCovarianceStampe
 
 void lama::Loc2DROS::onInitialPose(const Pose2D& prior)
 {
-    ROS_INFO("Setting pose to (%f, %f, %f)", prior.x(), prior.y() ,prior.rotation());
+    ROS_INFO("Setting initial pose to (%f, %f, %f)", prior.x(), prior.y() ,prior.rotation());
     loc2d_.setPose(prior);
     force_update_ = force_update_on_initial_pose_;
     current_orientation_ = tf::createQuaternionFromYaw(prior.rotation());
     publishCurrentPose();
+}
+
+// Pose subscribe like initialpose subscribe(sparolab)
+void lama::Loc2DROS::onPose(const geometry_msgs::PoseWithCovarianceStampedConstPtr& pose)
+{
+    float x = pose->pose.pose.position.x;
+    float y = pose->pose.pose.position.y;
+    float yaw = tf::getYaw(pose->pose.pose.orientation);
+
+    onPose(lama::Pose2D(x, y, yaw));
+}
+
+void lama::Loc2DROS::onPose(const Pose2D& prior)
+{
+    // ROS_INFO("Setting pose to (%f, %f, %f)", prior.x(), prior.y() ,prior.rotation());
+    loc2d_.setPose(prior, true);
+    current_orientation_ = tf::createQuaternionFromYaw(prior.rotation());
 }
 
 void lama::Loc2DROS::onLaserScan(const sensor_msgs::LaserScanConstPtr& laser_scan)
@@ -210,6 +284,12 @@ void lama::Loc2DROS::onLaserScan(const sensor_msgs::LaserScanConstPtr& laser_sca
 
     lama::Pose2D odom(odom_tf.getOrigin().x(), odom_tf.getOrigin().y(),
                               tf::getYaw(odom_tf.getRotation()));
+
+
+    // Force an update if the last update was a long time ago.
+    static ros::Time latest_update = laser_scan->header.stamp;
+    if ((not force_update_) and temporal_update_ > 0)
+        force_update_ = (laser_scan->header.stamp - latest_update).toSec() > temporal_update_;
 
     bool update = force_update_ or loc2d_.enoughMotion(odom);
 
@@ -255,6 +335,7 @@ void lama::Loc2DROS::onLaserScan(const sensor_msgs::LaserScanConstPtr& laser_sca
 
         loc2d_.update(cloud, odom, laser_scan->header.stamp.toSec(), force_update_);
         force_update_ = false;
+        latest_update = laser_scan->header.stamp;
 
         // Report global localization if enables
         if (loc2d_.globalLocalizationIsActive()){
@@ -262,30 +343,33 @@ void lama::Loc2DROS::onLaserScan(const sensor_msgs::LaserScanConstPtr& laser_sca
         }
 
         current_orientation_ = tf::createQuaternionFromYaw(loc2d_.getPose().rotation());
-        // subtracting base to odom from map to base and send map to odom instead
-        tf::Stamped<tf::Pose> odom_to_map;
-        try{
-            tf::Transform tmp_tf(current_orientation_, tf::Vector3(loc2d_.getPose().x(), loc2d_.getPose().y(), 0));
-            tf::Stamped<tf::Pose> tmp_tf_stamped (tmp_tf.inverse(), laser_scan->header.stamp, base_frame_id_);
-            tf_->transformPose(odom_frame_id_, tmp_tf_stamped, odom_to_map);
 
-        }catch(tf::TransformException){
-            ROS_WARN("Failed to subtract base to odom transform");
-            return;
+        if (publish_tf_){
+            // subtracting base to odom from map to base and send map to odom instead
+            tf::Stamped<tf::Pose> odom_to_map;
+            try{
+                tf::Transform tmp_tf(current_orientation_, tf::Vector3(loc2d_.getPose().x(), loc2d_.getPose().y(), 0));
+                tf::Stamped<tf::Pose> tmp_tf_stamped (tmp_tf.inverse(), laser_scan->header.stamp, base_frame_id_);
+                tf_->transformPose(odom_frame_id_, tmp_tf_stamped, odom_to_map);
+
+            }catch(tf::TransformException){
+                ROS_WARN("Failed to subtract base to odom transform");
+                return;
+            }
+
+            latest_tf_ = tf::Transform(tf::Quaternion(odom_to_map.getRotation()),
+                    tf::Point(odom_to_map.getOrigin()));
+
+            // We want to send a transform that is good up until a
+            // tolerance time so that odom can be used
+            ros::Time transform_expiration = (laser_scan->header.stamp + transform_tolerance_);
+            tf::StampedTransform tmp_tf_stamped(latest_tf_.inverse(), transform_expiration,
+                    global_frame_id_, odom_frame_id_);
+            tfb_->sendTransform(tmp_tf_stamped);
         }
 
-        latest_tf_ = tf::Transform(tf::Quaternion(odom_to_map.getRotation()),
-                                   tf::Point(odom_to_map.getOrigin()));
-
-        // We want to send a transform that is good up until a
-        // tolerance time so that odom can be used
-        ros::Time transform_expiration = (laser_scan->header.stamp + transform_tolerance_);
-        tf::StampedTransform tmp_tf_stamped(latest_tf_.inverse(),
-                                            transform_expiration,
-                                            global_frame_id_, odom_frame_id_);
-        tfb_->sendTransform(tmp_tf_stamped);
         publishCurrentPose();
-    } else {
+    } else if (publish_tf_) {
         // Nothing has change, therefore, republish the last transform.
         ros::Time transform_expiration = (laser_scan->header.stamp + transform_tolerance_);
         tf::StampedTransform tmp_tf_stamped(latest_tf_.inverse(), transform_expiration,

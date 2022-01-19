@@ -11,13 +11,13 @@
         <!-- The frame attached to the odometry system (default: "odometry"). -->
         <param name="odom_frame_id" value="odom"/>
         <!-- The frame attached to the mobile base (default: "base_link"). -->
-        <param name="base_frame_id" value="base_footprint"/>
+        <param name="base_frame_id" value="base_link"/>
 
         <!-- Laser scan topic to subscribe (default: "/scan"). -->
         <param name="scan_topic" value="scan"/>
 
         <!--  -->
-        <param name="transform_tolerance" value="0.0"/>
+        <param name="transform_tolerance" value="0.1"/>
 
         <!-- True to subscribe to the /map topic instead of requesting the map through the "static_map" service (default: false). -->
         <param name="use_map_topic" value="false"/>
@@ -42,7 +42,7 @@
         <!-- Maximum distance to use in the dynamic Euclidean distance map (default: 0.5 meters). -->
         <param name="l2_max" value="0.5"/>
         <!-- Scan matching optimization strategy, GaussNewton ("gm") or Levenberg Marquard ("lm") (default: "gn"). -->
-        <param name="strategy" value="lm"/>
+        <param name="strategy" value="gn"/>
 
         <!-- Number of particles used to find the best global localization (default: 3000) -->
         <param name="gloc_particles" value="3000"/>
